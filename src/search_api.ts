@@ -170,5 +170,6 @@ app.post('/api/search', async (req: Request<object, SearchResponse, SearchReques
 
 app.listen(PORT, () => {
   console.log(`Search API running at http://localhost:${PORT}`);
-  console.log(`Embedding: Together AI (nomic-embed-text-v1.5)`);
+  const provider = process.env.TOGETHER_API_KEY ? 'Together AI' : 'Ollama';
+  console.log(`Embedding: ${provider} (nomic-embed-text)`);
 });
