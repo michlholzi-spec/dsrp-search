@@ -65,6 +65,11 @@ async function extractLocation(query: string): Promise<GeocodedLocation | null> 
   return null;
 }
 
+// GET /health — lightweight healthcheck (no DB)
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok' });
+});
+
 // GET /api/provinces
 app.get('/api/provinces', async (_req: Request, res: Response) => {
   try {
