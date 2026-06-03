@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS offers (
   -- Kombinierter Text für semantische Suche (title + desc + keywords + categories)
   search_text              TEXT,
   -- Für pgvector Embeddings (wird später befüllt)
-  -- embedding             vector(1536),
+  -- embedding             vector(1536),  -- OpenAI text-embedding-3-small
   created_at               TIMESTAMPTZ,
   updated_at               TIMESTAMPTZ
 );

@@ -33,7 +33,7 @@ async function run(): Promise<void> {
     'SELECT COUNT(*) FROM offers WHERE embedding IS NULL AND search_text IS NOT NULL',
   );
   const total = parseInt(count);
-  const provider = process.env.TOGETHER_API_KEY ? 'Together AI' : 'Ollama';
+  const provider = process.env.HF_API_KEY ? 'HuggingFace' : 'Ollama';
   console.log(`Generating embeddings for ${total} offers (${provider}: nomic-embed-text)...`);
 
   let done = 0;
