@@ -175,6 +175,6 @@ app.post('/api/search', async (req: Request<object, SearchResponse, SearchReques
 
 app.listen(PORT, () => {
   console.log(`Search API running at http://localhost:${PORT}`);
-  const provider = process.env.HF_API_KEY ? 'HuggingFace' : 'Ollama';
+  const provider = process.env.OPENAI_API_KEY ? 'OpenAI' : 'Ollama';
   console.log(`Embedding: ${provider} (nomic-embed-text)`);
 });
