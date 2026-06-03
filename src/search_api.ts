@@ -18,7 +18,7 @@ const pg  = new Pool({ connectionString: PG_URI });
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public')));   // works for both src/ and dist/
 
 const PLACE_TYPES = new Set([
   'city', 'town', 'village', 'municipality', 'hamlet', 'suburb', 'quarter',

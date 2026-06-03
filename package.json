@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "DSRP Semantic Search API",
   "scripts": {
-    "start": "tsx src/search_api.ts",
     "build": "tsc",
-    "start:prod": "node dist/search_api.js",
+    "start": "node dist/search_api.js",
+    "dev": "tsx src/search_api.ts",
     "migrate": "tsx src/mongo_to_postgres.ts",
     "embeddings": "tsx src/generate_embeddings.ts",
     "export-csv": "tsx src/mongo_to_csv.ts",
