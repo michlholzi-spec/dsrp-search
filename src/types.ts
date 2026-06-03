@@ -60,6 +60,7 @@ export interface MongoOffer {
   appointmentArrangement?: string;
   institutionId?: string;
   institutionName?: string;
+  status?: string;
   validFrom?: Date;
   validTo?: Date;
   releasedFrom?: string;

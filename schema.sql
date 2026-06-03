@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS offers (
   location_post_codes      INTEGER[],
   keywords                 TEXT[],
   target_groups            TEXT[],
+  status                   TEXT DEFAULT 'released',
   -- Kombinierter Text für semantische Suche (title + desc + keywords + categories)
   search_text              TEXT,
   -- Für pgvector Embeddings (wird später befüllt)

@@ -168,17 +168,18 @@ async function processBatch(db: Db, offers: MongoOffer[]): Promise<void> {
            website, costs, costs_comment, modes_of_contact,
            anonymous_counseling, appointment_arrangement,
            institution_id, institution_name,
-           valid_from, valid_to, released_from, released_time,
+           status, valid_from, valid_to, released_from, released_time,
            location_provinces, location_post_codes,
            keywords, target_groups, search_text,
            created_at, updated_at
          ) VALUES(
            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
-           $13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
+           $13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
          )
          ON CONFLICT(id) DO UPDATE SET
            title=EXCLUDED.title, description=EXCLUDED.description,
-           search_text=EXCLUDED.search_text, updated_at=EXCLUDED.updated_at`,
+           status=EXCLUDED.status, search_text=EXCLUDED.search_text,
+           updated_at=EXCLUDED.updated_at`,
         [
           offerId,
           offer.title || '',
@@ -196,6 +197,7 @@ async function processBatch(db: Db, offers: MongoOffer[]): Promise<void> {
           offer.appointmentArrangement ?? null,
           offer.institutionId ?? null,
           offer.institutionName ?? null,
+          offer.status ?? 'released',
           offer.validFrom ?? null,
           offer.validTo ?? null,
           offer.releasedFrom ?? null,
