@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DSRP Semantische Suche</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.25rem; font-weight: 600; }
+    header span { font-size: 0.8rem; color: #8892b0; margin-top: 2px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 0;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      align-items: start;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      position: sticky;
+      top: 24px;
+    }
+    .sidebar h2 {
+      font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #8892b0; margin-bottom: 12px;
+    }
+    .sidebar-section { margin-bottom: 20px; }
+
+    /* Erkannter Ort-Chip unter Suchfeld */
+    .location-chip {
+      display: none; align-items: center; gap: 6px;
+      margin-bottom: 12px; font-size: 0.82rem; color: #0369a1;
+    }
+    .location-chip.visible { display: flex; }
+    .location-chip .chip {
+      background: #e0f2fe; border-radius: 20px; padding: 3px 10px;
+      font-weight: 600; display: flex; align-items: center; gap: 5px;
+    }
+
+    .province-list { display: flex; flex-direction: column; gap: 6px; }
+    .province-list label {
+      display: flex; align-items: center; gap: 8px;
+      cursor: pointer; font-size: 0.9rem; padding: 6px 8px;
+      border-radius: 6px; transition: background .15s;
+    }
+    .province-list label:hover { background: #f0f2f5; }
+    .province-list input[type=checkbox] { accent-color: #4f46e5; width: 15px; height: 15px; }
+
+    .btn-clear {
+      margin-top: 12px; width: 100%; padding: 7px;
+      border: 1px solid #e2e8f0; border-radius: 7px; background: #fff;
+      font-size: 0.82rem; color: #64748b; cursor: pointer; transition: background .15s;
+    }
+    .btn-clear:hover { background: #f8fafc; }
+
+    /* ── Main ── */
+    .main { padding-left: 20px; }
+
+    .search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+    .search-bar input {
+      flex: 1; padding: 12px 16px; border: 2px solid #e2e8f0;
+      border-radius: 10px; font-size: 1rem; outline: none; transition: border-color .2s;
+    }
+    .search-bar input:focus { border-color: #4f46e5; }
+    .search-bar button {
+      padding: 12px 24px; background: #4f46e5; color: #fff;
+      border: none; border-radius: 10px; font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: background .2s; white-space: nowrap;
+    }
+    .search-bar button:hover  { background: #4338ca; }
+    .search-bar button:disabled { background: #a5b4fc; cursor: not-allowed; }
+
+    .meta-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px; min-height: 24px;
+    }
+    .meta-row .count { font-size: 0.88rem; color: #64748b; }
+    .limit-select { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: #64748b; }
+    .limit-select select {
+      padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 6px;
+      font-size: 0.88rem; background: #fff;
+    }
+
+    /* ── Cards ── */
+    .results { display: flex; flex-direction: column; gap: 14px; }
+
+    .card {
+      background: #fff; border-radius: 12px; padding: 20px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+      border-left: 4px solid transparent;
+      transition: box-shadow .2s, transform .2s;
+    }
+    .card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); transform: translateY(-1px); }
+    .card.high   { border-left-color: #22c55e; }
+    .card.medium { border-left-color: #f59e0b; }
+    .card.low    { border-left-color: #e2e8f0; }
+
+    .card-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 12px; margin-bottom: 8px;
+    }
+    .card-title { font-size: 1.05rem; font-weight: 700; color: #1a1a2e; line-height: 1.3; }
+    .card-title a { color: inherit; text-decoration: none; }
+    .card-title a:hover { color: #4f46e5; }
+
+    .card-badges { display: flex; gap: 6px; flex-shrink: 0; align-items: flex-start; flex-wrap: wrap; justify-content: flex-end; }
+
+    .score-badge {
+      font-size: 0.78rem; font-weight: 700; padding: 3px 9px;
+      border-radius: 20px; white-space: nowrap;
+    }
+    .high .score-badge   { background: #dcfce7; color: #166534; }
+    .medium .score-badge { background: #fef3c7; color: #92400e; }
+    .low .score-badge    { background: #f1f5f9; color: #475569; }
+
+    .distance-badge {
+      font-size: 0.78rem; font-weight: 600; padding: 3px 9px;
+      border-radius: 20px; white-space: nowrap;
+      background: #e0f2fe; color: #0369a1;
+      display: flex; align-items: center; gap: 4px;
+    }
+
+    .card-institution { font-size: 0.82rem; color: #4f46e5; font-weight: 600; margin-bottom: 8px; }
+
+    .card-desc {
+      font-size: 0.88rem; color: #475569; line-height: 1.6;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .card-desc.expanded { -webkit-line-clamp: unset; }
+
+    .toggle-desc {
+      font-size: 0.78rem; color: #4f46e5; cursor: pointer; background: none;
+      border: none; padding: 0; margin-top: 4px; display: block;
+    }
+    .toggle-desc:hover { text-decoration: underline; }
+
+    .card-footer { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .tags { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+    .tag {
+      font-size: 0.73rem; padding: 2px 8px; border-radius: 20px;
+      background: #ede9fe; color: #5b21b6; font-weight: 500;
+    }
+    .tag.province  { background: #dbeafe; color: #1e40af; }
+    .tag.cost-free { background: #dcfce7; color: #166534; }
+
+    .card-locations { margin-top: 10px; font-size: 0.82rem; color: #64748b; }
+    .card-locations strong { color: #374151; }
+
+    /* ── States ── */
+    .state-box {
+      text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 0.95rem;
+    }
+    .state-box .icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid #e2e8f0;
+      border-top-color: #4f46e5; border-radius: 50%;
+      animation: spin .7s linear infinite; margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .main { padding-left: 0; margin-top: 16px; }
+      .sidebar { position: static; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>DSRP Semantische Suche</h1>
+    <span>Powered by nomic-embed-text &amp; pgvector</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <h2>Bundesland</h2>
+      <div class="province-list" id="provinceList">
+        <div class="state-box" style="padding:20px 0"><div class="spinner"></div></div>
+      </div>
+      <button class="btn-clear" onclick="clearProvinces()">Alle abwählen</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="search-bar">
+      <input
+        type="text"
+        id="queryInput"
+        placeholder="z.B. Pflegegeld Innsbruck, Beratung Wien..."
+        onkeydown="if(event.key==='Enter') search()"
+      />
+      <button id="searchBtn" onclick="search()">Suchen</button>
+    </div>
+
+    <!-- Erkannter Ort wird hier angezeigt -->
+    <div class="location-chip" id="locationChip">
+      <span>Ort erkannt:</span>
+      <span class="chip">📍 <span id="locationName"></span></span>
+      <span style="color:#94a3b8">→ Entfernungen werden berechnet</span>
+    </div>
+
+    <div class="meta-row">
+      <span class="count" id="resultCount"></span>
+      <div class="limit-select">
+        Ergebnisse:
+        <select id="limitSelect" onchange="if(lastQuery) geocodeAndSearch()">
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="results">
+      <div class="state-box">
+        <div class="icon">🔍</div>
+        Suchbegriff eingeben und Enter drücken
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  const API = '';
+  let lastQuery = '';
+
+  // ── Load provinces ──
+  async function loadProvinces() {
+    const res  = await fetch(`${API}/api/provinces`);
+    const list = await res.json();
+    const el   = document.getElementById('provinceList');
+    el.innerHTML = list.map(p => `
+      <label>
+        <input type="checkbox" value="${p}" onchange="if(lastQuery) search()" checked />
+        ${p}
+      </label>
+    `).join('');
+  }
+
+  function getSelectedProvinces() {
+    return [...document.querySelectorAll('#provinceList input:checked')].map(i => i.value);
+  }
+  function clearProvinces() {
+    document.querySelectorAll('#provinceList input').forEach(i => i.checked = false);
+    if (lastQuery) search();
+  }
+
+  // ── Search ──
+  async function search() {
+    const query = document.getElementById('queryInput').value.trim();
+    if (!query) return;
+    lastQuery = query;
+
+    const limit     = parseInt(document.getElementById('limitSelect').value);
+    const provinces = getSelectedProvinces();
+    const btn       = document.getElementById('searchBtn');
+
+    btn.disabled = true;
+    btn.textContent = 'Suche...';
+    document.getElementById('locationChip').classList.remove('visible');
+    document.getElementById('results').innerHTML =
+      `<div class="state-box"><div class="spinner"></div>Embeddings werden berechnet...</div>`;
+    document.getElementById('resultCount').textContent = '';
+
+    try {
+      const res  = await fetch(`${API}/api/search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, provinces, limit }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      if (data.location) {
+        document.getElementById('locationName').textContent = data.location.name;
+        document.getElementById('locationChip').classList.add('visible');
+      }
+
+      renderResults(data.results, !!data.location);
+    } catch (err) {
+      document.getElementById('results').innerHTML =
+        `<div class="state-box"><div class="icon">⚠️</div>${err.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Suchen';
+    }
+  }
+
+  // ── Render ──
+  function renderResults(results, showDistance) {
+    const countEl = document.getElementById('resultCount');
+
+    if (results.length === 0) {
+      countEl.textContent = 'Keine Ergebnisse';
+      document.getElementById('results').innerHTML =
+        `<div class="state-box"><div class="icon">😕</div>Keine passenden Angebote gefunden</div>`;
+      return;
+    }
+
+    countEl.textContent = `${results.length} Ergebnis${results.length !== 1 ? 'se' : ''}`;
+
+    document.getElementById('results').innerHTML = results.map((r, i) => {
+      const score   = parseFloat(r.score);
+      const pct     = Math.round(score * 100);
+      const quality = score >= 0.75 ? 'high' : score >= 0.55 ? 'medium' : 'low';
+      const desc    = r.description_print || r.description || '';
+      const cats    = (r.categories || []).map(c =>
+        `<span class="tag">${esc(c.label)}</span>`).join('');
+      const provs   = (r.location_provinces || []).map(p =>
+        `<span class="tag province">${esc(p)}</span>`).join('');
+      const costTag = r.costs === 'no' ? `<span class="tag cost-free">Kostenlos</span>` : '';
+      const locs    = (r.locations || []).filter(l => l.city).slice(0, 3)
+        .map(l => `${l.city}${l.street ? ', ' + l.street : ''}`).join(' · ');
+      const title   = r.website
+        ? `<a href="${esc(r.website)}" target="_blank" rel="noopener">${esc(r.title)}</a>`
+        : esc(r.title);
+      const longDesc = desc.length > 200;
+
+      const distBadge = showDistance && r.distance_km != null
+        ? `<span class="distance-badge">📍 ${formatDist(r.distance_km)}</span>`
+        : '';
+
+      return `
+        <div class="card ${quality}">
+          <div class="card-header">
+            <div class="card-title">${title}</div>
+            <div class="card-badges">
+              ${distBadge}
+              <span class="score-badge">${pct}% Match</span>
+            </div>
+          </div>
+          <div class="card-institution">${esc(r.institution_name || '')}</div>
+          ${desc ? `
+            <div class="card-desc" id="desc-${i}">${esc(desc)}</div>
+            ${longDesc ? `<button class="toggle-desc" onclick="toggleDesc(${i})">Mehr anzeigen</button>` : ''}
+          ` : ''}
+          <div class="card-footer">
+            <div class="tags">${cats}${provs}${costTag}</div>
+          </div>
+          ${locs ? `<div class="card-locations"><strong>Standort:</strong> ${esc(locs)}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  function formatDist(km) {
+    const k = parseFloat(km);
+    if (k < 1)   return `${Math.round(k * 1000)} m`;
+    if (k < 10)  return `${k.toFixed(1)} km`;
+    return `${Math.round(k)} km`;
+  }
+
+  function toggleDesc(i) {
+    const el  = document.getElementById(`desc-${i}`);
+    const btn = el.nextElementSibling;
+    el.classList.toggle('expanded');
+    btn.textContent = el.classList.contains('expanded') ? 'Weniger anzeigen' : 'Mehr anzeigen';
+  }
+
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  loadProvinces();
+</script>
+</body>
+</html>

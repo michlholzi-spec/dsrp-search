@@ -1,0 +1,29 @@
+{
+  "name": "dsrp-search",
+  "version": "1.0.0",
+  "description": "DSRP Semantic Search API",
+  "scripts": {
+    "start": "tsx src/search_api.ts",
+    "build": "tsc",
+    "start:prod": "node dist/search_api.js",
+    "migrate": "tsx src/mongo_to_postgres.ts",
+    "embeddings": "tsx src/generate_embeddings.ts",
+    "export-csv": "tsx src/mongo_to_csv.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongodb": "^6.0.0",
+    "pg": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
