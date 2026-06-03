@@ -70,6 +70,18 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });
 });
 
+// GET /api/search-terms
+app.get('/api/search-terms', async (_req: Request, res: Response) => {
+  try {
+    const { rows } = await pg.query<{ term: string }>(
+      'SELECT term FROM search_terms ORDER BY term',
+    );
+    res.json(rows.map(r => r.term));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // GET /api/provinces
 app.get('/api/provinces', async (_req: Request, res: Response) => {
   try {

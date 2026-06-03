@@ -77,6 +77,30 @@
     }
     .btn-clear:hover { background: #f8fafc; }
 
+    /* Search Terms */
+    .term-filter {
+      margin-bottom: 6px; padding: 6px 8px;
+      border: 1.5px solid #e2e8f0; border-radius: 7px;
+      font-size: 0.82rem; width: 100%; outline: none; transition: border-color .2s;
+    }
+    .term-filter:focus { border-color: #4f46e5; }
+
+    .term-list {
+      max-height: 220px; overflow-y: auto;
+      border: 1px solid #e2e8f0; border-radius: 8px;
+      background: #fafafa;
+    }
+    .term-list::-webkit-scrollbar { width: 5px; }
+    .term-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+    .term-item {
+      padding: 6px 10px; font-size: 0.82rem; cursor: pointer;
+      color: #374151; transition: background .12s;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .term-item:last-child { border-bottom: none; }
+    .term-item:hover { background: #ede9fe; color: #4f46e5; }
+
     /* ── Main ── */
     .main { padding-left: 20px; }
 
@@ -203,6 +227,22 @@
 
   <!-- Sidebar -->
   <aside class="sidebar">
+
+    <!-- Search Terms -->
+    <div class="sidebar-section">
+      <h2>Beliebte Suchbegriffe</h2>
+      <input
+        type="text"
+        class="term-filter"
+        id="termFilter"
+        placeholder="Filtern..."
+        oninput="filterTerms()"
+      />
+      <div class="term-list" id="termList">
+        <div class="state-box" style="padding:16px 0"><div class="spinner"></div></div>
+      </div>
+    </div>
+
     <div class="sidebar-section">
       <h2>Bundesland</h2>
       <div class="province-list" id="provinceList">
@@ -255,6 +295,36 @@
 <script>
   const API = '';
   let lastQuery = '';
+
+  // ── Load search terms ──
+  let allTerms = [];
+
+  async function loadSearchTerms() {
+    const res  = await fetch(`${API}/api/search-terms`);
+    allTerms   = await res.json();
+    renderTerms(allTerms);
+  }
+
+  function renderTerms(terms) {
+    const el = document.getElementById('termList');
+    if (!terms.length) {
+      el.innerHTML = '<div class="term-item" style="color:#94a3b8">Keine Treffer</div>';
+      return;
+    }
+    el.innerHTML = terms.map(t =>
+      `<div class="term-item" onclick="selectTerm('${esc(t)}')">${esc(t)}</div>`
+    ).join('');
+  }
+
+  function filterTerms() {
+    const q = document.getElementById('termFilter').value.toLowerCase();
+    renderTerms(q ? allTerms.filter(t => t.toLowerCase().includes(q)) : allTerms);
+  }
+
+  function selectTerm(term) {
+    document.getElementById('queryInput').value = term;
+    document.getElementById('queryInput').focus();
+  }
 
   // ── Load provinces ──
   async function loadProvinces() {
@@ -394,6 +464,7 @@
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  loadSearchTerms();
   loadProvinces();
 </script>
 </body>

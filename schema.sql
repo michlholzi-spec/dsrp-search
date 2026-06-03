@@ -99,6 +99,11 @@ CREATE TABLE IF NOT EXISTS offer_locations (
   PRIMARY KEY (offer_id, location_id)
 );
 
+-- Suchbegriffe aus Searchlogs
+CREATE TABLE IF NOT EXISTS search_terms (
+  term TEXT PRIMARY KEY
+);
+
 -- Indizes für Performance
 CREATE INDEX IF NOT EXISTS idx_offers_search_text     ON offers USING gin(to_tsvector('german', search_text));
 CREATE INDEX IF NOT EXISTS idx_offers_institution_id  ON offers(institution_id);
