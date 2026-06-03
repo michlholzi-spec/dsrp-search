@@ -27,23 +27,28 @@ const PLACE_TYPES = new Set([
 ]);
 
 async function geocodePlace(candidate: string): Promise<GeocodedLocation | null> {
-  const url = `https://nominatim.openstreetmap.org/search`
-    + `?q=${encodeURIComponent(candidate + ', Österreich')}`
-    + `&format=json&limit=1&countrycodes=at&addressdetails=0`;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search`
+      + `?q=${encodeURIComponent(candidate + ', Österreich')}`
+      + `&format=json&limit=1&countrycodes=at&addressdetails=0`;
 
-  const res  = await fetch(url, { headers: { 'User-Agent': 'dsrp-search/1.0' } });
-  const data = await res.json() as NominatimResult[];
+    const res  = await fetch(url, { headers: { 'User-Agent': 'dsrp-search/1.0' } });
+    if (!res.ok) return null;
+    const data = await res.json() as NominatimResult[];
 
-  if (!data.length) return null;
-  const hit = data[0];
-  if (!PLACE_TYPES.has(hit.type) && !PLACE_TYPES.has(hit.addresstype)) return null;
+    if (!data.length) return null;
+    const hit = data[0];
+    if (!PLACE_TYPES.has(hit.type) && !PLACE_TYPES.has(hit.addresstype)) return null;
 
-  return {
-    lat:        parseFloat(hit.lat),
-    lng:        parseFloat(hit.lon),
-    name:       hit.display_name.split(',')[0],
-    cleanQuery: '',
-  };
+    return {
+      lat:        parseFloat(hit.lat),
+      lng:        parseFloat(hit.lon),
+      name:       hit.display_name.split(',')[0],
+      cleanQuery: '',
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function extractLocation(query: string): Promise<GeocodedLocation | null> {
@@ -68,6 +73,66 @@ async function extractLocation(query: string): Promise<GeocodedLocation | null> 
 // GET /health — lightweight healthcheck (no DB)
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });
+});
+
+const ALL_PROVINCES = ['tirol','wien','salzburg','steiermark','vorarlberg','kaernten','niederoesterreich','oberoesterreich'];
+
+async function fetchSrpProvince(q: string, province: string): Promise<Record<string, unknown>[]> {
+  const url = `https://www.sozialroutenplan.at/api/de/${encodeURIComponent(province)}/searchOffersWithFilter/alle/alle/alle/alle/${encodeURIComponent(q)}`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'dsrp-search/1.0' } });
+  if (!res.ok) return [];
+  return res.json() as Promise<Record<string, unknown>[]>;
+}
+
+function mapSrpOffer(o: Record<string, unknown>) {
+  return {
+    id:               o['_id'],
+    title:            o['title'],
+    slug:             o['slug'],
+    institution_name: o['institutionName'],
+    description:      o['descriptionPrint'] || o['description'],
+    website:          o['website'],
+    costs:            o['costs'],
+    location_provinces: o['locationProvinces'],
+    categories:       (o['categories'] as { label: string }[] ?? []).map(c => ({ label: c.label, slug: '' })),
+    locations:        (o['locations'] as Record<string, unknown>[] ?? [])
+                        .map(l => ({ city: l['city'], street: l['street'], formatted_address: l['formatedAddress'] })),
+    score:            o['score'],
+  };
+}
+
+// GET /api/srp?q=pflegegeld&provinces=tirol,wien  (leer = alle)
+app.get('/api/srp', async (req: Request, res: Response) => {
+  const q         = String(req.query['q'] ?? '').trim();
+  const provinces = String(req.query['provinces'] ?? '')
+    .split(',').map(p => p.trim()).filter(Boolean);
+
+  if (!q) { res.status(400).json({ error: 'q is required' }); return; }
+
+  const targets = provinces.length ? provinces : ALL_PROVINCES;
+
+  try {
+    const batches = await Promise.all(targets.map(p => fetchSrpProvince(q, p)));
+    // Deduplicate by _id, keep highest score
+    const seen = new Map<string, Record<string, unknown>>();
+    for (const batch of batches) {
+      for (const o of batch) {
+        const id = String(o['_id']);
+        const existing = seen.get(id);
+        if (!existing || (Number(o['score']) > Number(existing['score']))) {
+          seen.set(id, o);
+        }
+      }
+    }
+    const results = [...seen.values()]
+      .sort((a, b) => Number(b['score']) - Number(a['score']))
+      .slice(0, 50)
+      .map(mapSrpOffer);
+
+    res.json({ results });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
 });
 
 // GET /api/search-terms
@@ -111,8 +176,10 @@ app.post('/api/search', async (req: Request<object, SearchResponse, SearchReques
 
     const hasLocation = location !== null;
     const vector      = `[${embedding.join(',')}]`;
-    const params: unknown[] = [vector, Math.min(limit, 50)];
-    let paramIndex = 3;
+    // Clean query for text matching (strip extracted location)
+    const cleanQuery = location?.cleanQuery ?? query.trim();
+    const params: unknown[] = [vector, Math.min(limit, 50), cleanQuery];
+    let paramIndex = 4;
 
     const provinceFilter = provinces.length > 0
       ? `AND o.location_provinces && $${paramIndex++}::text[]`
@@ -146,7 +213,11 @@ app.post('/api/search', async (req: Request<object, SearchResponse, SearchReques
          o.description, o.description_print, o.website, o.costs,
          o.modes_of_contact, o.location_provinces, o.location_post_codes,
          o.keywords, o.target_groups,
-         ROUND((1 - (o.embedding <=> $1::vector))::numeric, 4) AS score,
+         ROUND((
+           (1 - (o.embedding <=> $1::vector))
+           + CASE WHEN o.title          ILIKE '%' || $3 || '%' THEN 0.15 ELSE 0 END
+           + CASE WHEN o.institution_name ILIKE '%' || $3 || '%' THEN 0.10 ELSE 0 END
+         )::numeric, 4) AS score,
          ${distanceExpr} AS distance_km,
          (
            SELECT json_agg(json_build_object('label', c.label, 'slug', c.slug))
@@ -166,6 +237,7 @@ app.post('/api/search', async (req: Request<object, SearchResponse, SearchReques
          ) AS locations
        FROM offers o
        WHERE o.embedding IS NOT NULL
+       AND (1 - (o.embedding <=> $1::vector)) >= 0.35
        ${provinceFilter}
        ORDER BY o.embedding <=> $1::vector
        LIMIT $2`,
