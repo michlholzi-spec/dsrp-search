@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sozialberatung Chat</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: #4f46e5; display: flex; align-items: center;
+      justify-content: center; font-size: 1.2rem;
+    }
+    .header-title { font-size: 1rem; font-weight: 600; }
+    .header-sub   { font-size: 0.75rem; color: #8892b0; margin-top: 1px; }
+    header a {
+      font-size: 0.8rem; color: #8892b0; text-decoration: none;
+    }
+    header a:hover { color: #fff; }
+
+    .chat-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 0;
+      gap: 0;
+    }
+
+    /* ── Chat column ── */
+    .chat-col {
+      display: flex;
+      flex-direction: column;
+      flex: 0 0 480px;
+      background: #fff;
+      border-right: 1px solid #e2e8f0;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .messages::-webkit-scrollbar { width: 5px; }
+    .messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+    .bubble-wrap { display: flex; gap: 8px; align-items: flex-end; }
+    .bubble-wrap.user { flex-direction: row-reverse; }
+
+    .bubble-avatar {
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+      background: #4f46e5; display: flex; align-items: center;
+      justify-content: center; font-size: 0.85rem; color: #fff;
+    }
+    .bubble-wrap.user .bubble-avatar { background: #e2e8f0; color: #64748b; }
+
+    .bubble {
+      max-width: 340px; padding: 10px 14px; border-radius: 16px;
+      font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap;
+    }
+    .bubble-wrap.bot  .bubble { background: #f1f5f9; color: #1a1a2e; border-bottom-left-radius: 4px; }
+    .bubble-wrap.user .bubble { background: #4f46e5; color: #fff; border-bottom-right-radius: 4px; }
+
+    .typing {
+      display: flex; gap: 4px; align-items: center; padding: 12px 14px;
+      background: #f1f5f9; border-radius: 16px; border-bottom-left-radius: 4px;
+      width: fit-content;
+    }
+    .typing span {
+      width: 7px; height: 7px; border-radius: 50%; background: #94a3b8;
+      animation: bounce 1.2s infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: .2s; }
+    .typing span:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+    .input-row {
+      padding: 12px 16px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      gap: 8px;
+    }
+    .input-row textarea {
+      flex: 1; padding: 10px 14px; border: 2px solid #e2e8f0;
+      border-radius: 20px; font-size: 0.9rem; outline: none;
+      resize: none; height: 44px; line-height: 1.4; font-family: inherit;
+      transition: border-color .2s;
+    }
+    .input-row textarea:focus { border-color: #4f46e5; }
+    .input-row button {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: #4f46e5; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 1.1rem; transition: background .2s; flex-shrink: 0;
+    }
+    .input-row button:hover    { background: #4338ca; }
+    .input-row button:disabled { background: #a5b4fc; cursor: not-allowed; }
+
+    /* ── Offers column ── */
+    .offers-col {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .offers-col::-webkit-scrollbar { width: 5px; }
+    .offers-col::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+    .offers-header {
+      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #8892b0; margin-bottom: 4px;
+    }
+
+    .offer-card {
+      background: #fff; border-radius: 12px; padding: 16px 18px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+      border-left: 4px solid #4f46e5;
+      animation: fadeIn .3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .offer-title { font-size: 0.95rem; font-weight: 700; color: #1a1a2e; margin-bottom: 4px; }
+    .offer-title a { color: inherit; text-decoration: none; }
+    .offer-title a:hover { color: #4f46e5; }
+    .offer-inst  { font-size: 0.78rem; color: #4f46e5; font-weight: 600; margin-bottom: 6px; }
+    .offer-desc  {
+      font-size: 0.82rem; color: #475569; line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .offer-tags  { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .offer-tag   {
+      font-size: 0.7rem; padding: 2px 7px; border-radius: 20px;
+      background: #ede9fe; color: #5b21b6;
+    }
+    .offer-tag.free { background: #dcfce7; color: #166534; }
+    .offer-score {
+      font-size: 0.7rem; font-weight: 700; padding: 2px 7px;
+      border-radius: 20px; background: #dbeafe; color: #1e40af; margin-left: auto;
+    }
+    .offer-footer { display: flex; align-items: center; margin-top: 8px; }
+
+    .empty-offers {
+      text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 0.9rem;
+    }
+    .empty-offers .icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+    @media (max-width: 768px) {
+      .chat-layout { flex-direction: column; }
+      .chat-col { flex: none; height: 60vh; border-right: none; border-bottom: 1px solid #e2e8f0; }
+      .offers-col { height: 40vh; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="avatar">🧑‍💼</div>
+    <div>
+      <div class="header-title">Sozialberatung</div>
+      <div class="header-sub">KI-gestützte Beratung · DSRP</div>
+    </div>
+  </div>
+  <a href="/">← Zurück zur Suche</a>
+</header>
+
+<div class="chat-layout">
+
+  <!-- Chat -->
+  <div class="chat-col">
+    <div class="messages" id="messages"></div>
+    <div class="input-row">
+      <textarea
+        id="input"
+        placeholder="Ihre Frage oder Situation beschreiben..."
+        onkeydown="handleKey(event)"
+        rows="1"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button id="sendBtn" onclick="send()" title="Senden">➤</button>
+    </div>
+  </div>
+
+  <!-- Gefundene Angebote -->
+  <div class="offers-col" id="offersCol">
+    <div class="empty-offers">
+      <div class="icon">💬</div>
+      Gefundene Angebote erscheinen hier
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API = '';
+  const history = [];
+
+  // Begrüßung
+  window.addEventListener('DOMContentLoaded', () => {
+    appendBotMessage('Guten Tag! Ich bin Ihr digitaler Sozialberater. Ich helfe Ihnen dabei, passende Beratungsstellen und Unterstützungsangebote in Ihrer Region zu finden.\n\nBitte schildern Sie mir kurz Ihre Situation oder Ihr Anliegen – zum Beispiel: „Ich suche Pflegeunterstützung für meine Mutter in Tirol" oder „Ich brauche Hilfe mit Schulden in Innsbruck".');
+  });
+
+  function appendBotMessage(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'bubble-wrap bot';
+    wrap.innerHTML = `
+      <div class="bubble-avatar">🧑‍💼</div>
+      <div class="bubble">${esc(text)}</div>
+    `;
+    document.getElementById('messages').appendChild(wrap);
+    scrollToBottom();
+  }
+
+  function appendUserMessage(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'bubble-wrap user';
+    wrap.innerHTML = `
+      <div class="bubble-avatar">👤</div>
+      <div class="bubble">${esc(text)}</div>
+    `;
+    document.getElementById('messages').appendChild(wrap);
+    scrollToBottom();
+  }
+
+  function showTyping() {
+    const wrap = document.createElement('div');
+    wrap.className = 'bubble-wrap bot';
+    wrap.id = 'typing';
+    wrap.innerHTML = `
+      <div class="bubble-avatar">🧑‍💼</div>
+      <div class="typing"><span></span><span></span><span></span></div>
+    `;
+    document.getElementById('messages').appendChild(wrap);
+    scrollToBottom();
+    return wrap;
+  }
+
+  function renderOffers(offers) {
+    const col = document.getElementById('offersCol');
+    if (!offers?.length) return;
+
+    col.innerHTML = `<div class="offers-header">Gefundene Angebote (${offers.length})</div>` +
+      offers.map(o => {
+        const desc  = o.description_print || o.description || '';
+        const cats  = (o.categories || []).map(c => `<span class="offer-tag">${esc(c.label)}</span>`).join('');
+        const free  = o.costs === 'no' ? `<span class="offer-tag free">Kostenlos</span>` : '';
+        const dist  = o.distance_km != null
+          ? `<span class="offer-score" style="background:#e0f2fe;color:#0369a1">📍 ${parseFloat(o.distance_km) < 1 ? Math.round(parseFloat(o.distance_km)*1000)+'m' : parseFloat(o.distance_km).toFixed(1)+'km'}</span>`
+          : '';
+        const score = o.score ? `<span class="offer-score">${Math.round(o.score * 100)}%</span>` : '';
+        const title = o.website
+          ? `<a href="${esc(o.website)}" target="_blank" rel="noopener">${esc(o.title)}</a>`
+          : esc(o.title);
+        return `
+          <div class="offer-card">
+            <div class="offer-title">${title}</div>
+            <div class="offer-inst">${esc(o.institution_name || '')}</div>
+            ${desc ? `<div class="offer-desc">${esc(desc)}</div>` : ''}
+            ${(o.locations||[]).filter(l=>l.city).length ? `
+              <div style="margin-top:8px;font-size:0.78rem;color:#64748b">
+                📍 ${(o.locations).filter(l=>l.city).slice(0,3).map(l=>`${esc(l.city)}${l.street?', '+esc(l.street):''}`).join(' · ')}
+              </div>` : ''}
+            <div class="offer-footer">
+              <div class="offer-tags">${cats}${free}</div>
+              <div style="display:flex;gap:4px;flex-shrink:0">${dist}${score}</div>
+            </div>
+          </div>`;
+      }).join('');
+  }
+
+  async function send() {
+    const input = document.getElementById('input');
+    const text  = input.value.trim();
+    if (!text) return;
+
+    input.value = '';
+    input.style.height = '44px';
+    document.getElementById('sendBtn').disabled = true;
+
+    appendUserMessage(text);
+    history.push({ role: 'user', content: text });
+
+    const typing = showTyping();
+
+    try {
+      const res  = await fetch(`${API}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Fehler');
+
+      typing.remove();
+      appendBotMessage(data.reply);
+      history.push({ role: 'assistant', content: data.reply });
+
+      if (data.offers?.length > 0) renderOffers(data.offers);
+    } catch (err) {
+      typing.remove();
+      appendBotMessage(`Entschuldigung, es ist ein Fehler aufgetreten: ${err.message}`);
+    } finally {
+      document.getElementById('sendBtn').disabled = false;
+      input.focus();
+    }
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  }
+
+  function autoResize(el) {
+    el.style.height = '44px';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function scrollToBottom() {
+    const m = document.getElementById('messages');
+    m.scrollTop = m.scrollHeight;
+  }
+
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+      .replace(/\n/g,'<br>');
+  }
+</script>
+</body>
+</html>
