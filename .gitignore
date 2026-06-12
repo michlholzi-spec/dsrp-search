@@ -4,3 +4,4 @@ dist/
 *.csv
 *.sql
 .claude/
+public/liveavatar-sdk.js

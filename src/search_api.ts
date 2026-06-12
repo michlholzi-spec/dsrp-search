@@ -329,6 +329,98 @@ async function searchOffersForChat(
   return rows;
 }
 
+// Serve LiveAvatar SDK from node_modules
+app.use('/sdk/liveavatar', express.static(
+  path.join(__dirname, '..', 'node_modules', '@heygen', 'liveavatar-web-sdk', 'dist')
+));
+
+const LIVEAVATAR_API = 'https://api.liveavatar.com';
+const LIVEAVATAR_KEY = process.env.LIVEAVATAR_KEY ?? process.env.LIVEAVATAR_API_KEY ?? '';
+
+async function stopAllActiveSessions(): Promise<void> {
+  try {
+    const r    = await fetch(`${LIVEAVATAR_API}/v1/sessions?type=active`, { headers: { 'X-API-KEY': LIVEAVATAR_KEY } });
+    const data = await r.json() as { data?: { results?: { id: string }[] } };
+    for (const s of data.data?.results ?? []) {
+      await fetch(`${LIVEAVATAR_API}/v1/sessions/stop`, {
+        method: 'POST',
+        headers: { 'X-API-KEY': LIVEAVATAR_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: s.id }),
+      });
+    }
+  } catch { /* ignore */ }
+}
+
+// POST /api/avatar/session — creates context + session, returns LiveKit credentials
+app.post('/api/avatar/session', async (_req: Request, res: Response) => {
+  if (!LIVEAVATAR_KEY) { res.status(500).json({ error: 'LIVEAVATAR_API_KEY not set' }); return; }
+
+  try {
+    // Stop any lingering sessions first
+    await stopAllActiveSessions();
+    // 1. Reuse existing context or create new one
+    const ctxName = 'Sozialberater-DSRP';
+    let contextId: string | undefined;
+
+    // Try to find existing context
+    const listRes  = await fetch(`${LIVEAVATAR_API}/v1/contexts`, {
+      headers: { 'X-API-KEY': LIVEAVATAR_KEY },
+    });
+    const listData = await listRes.json() as { data?: { results?: { id: string; name: string }[] } };
+    const existing = listData.data?.results?.find(c => c.name === ctxName);
+    if (existing) {
+      contextId = existing.id;
+    } else {
+      const ctxRes  = await fetch(`${LIVEAVATAR_API}/v1/contexts`, {
+        method: 'POST',
+        headers: { 'X-API-KEY': LIVEAVATAR_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: ctxName,
+          prompt: 'Du bist ein Sozialberater in Tirol. Warte auf Fragen und antworte kurz auf Deutsch.',
+          opening_text: 'Guten Tag! Wie kann ich Ihnen helfen?',
+        }),
+      });
+      const ctxData = await ctxRes.json() as { data?: { id: string } };
+      contextId = ctxData.data?.id;
+    }
+    if (!contextId) throw new Error('Kontext konnte nicht erstellt werden');
+
+    // 2. Create session token — SDK handles /sessions/start internally
+    const tokenRes  = await fetch(`${LIVEAVATAR_API}/v1/sessions/token`, {
+      method: 'POST',
+      headers: { 'X-API-KEY': LIVEAVATAR_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mode: 'FULL',
+        is_sandbox: true,
+        avatar_id: 'dd73ea75-1218-4ef3-92ce-606d5f7fbc0a',
+        avatar_persona: { context_id: contextId, language: 'de' },
+      }),
+    });
+    const tokenData = await tokenRes.json() as { data?: { session_id: string; session_token: string } };
+    const { session_id, session_token } = tokenData.data ?? {};
+    if (!session_token) throw new Error('Session Token fehlgeschlagen');
+
+    res.json({ session_id, session_token });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+// POST /api/avatar/stop
+app.post('/api/avatar/stop', async (req: Request, res: Response) => {
+  const { session_token } = req.body as { session_token: string };
+  if (!session_token) { res.status(400).json({ error: 'session_token required' }); return; }
+  try {
+    await fetch(`${LIVEAVATAR_API}/v1/sessions/stop`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${session_token}` },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 // POST /api/chat
 app.post('/api/chat', async (req: Request, res: Response) => {
   const { messages }: { messages: ChatMessage[] } = req.body;

@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sozialberatung · Video Avatar</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f1a;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background: #1a1a2e;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #2d2d4e;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-title { font-size: 1rem; font-weight: 600; color: #fff; }
+    .header-sub   { font-size: 0.73rem; color: #6366f1; margin-top: 1px; }
+    .header-links { display: flex; gap: 16px; }
+    .header-links a { font-size: 0.8rem; color: #6b7280; text-decoration: none; }
+    .header-links a:hover { color: #e2e8f0; }
+
+    /* ── Layout ── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Avatar column ── */
+    .avatar-col {
+      flex: 0 0 520px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0f0f1a;
+      position: relative;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    .video-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 460px;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #1a1a2e;
+      aspect-ratio: 16/9;
+      box-shadow: 0 0 40px rgba(99,102,241,.2);
+    }
+    #avatarVideo {
+      width: 100%; height: 100%; object-fit: cover;
+      display: none;
+    }
+    .video-placeholder {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 12px; color: #6b7280; font-size: 0.9rem;
+    }
+    .video-placeholder .icon { font-size: 3rem; }
+
+    /* Listening indicator */
+    .listening-ring {
+      position: absolute; inset: -4px;
+      border-radius: 20px;
+      border: 3px solid #6366f1;
+      opacity: 0;
+      transition: opacity .3s;
+      pointer-events: none;
+    }
+    .listening-ring.active { opacity: 1; animation: pulse-ring 1.5s ease-in-out infinite; }
+    @keyframes pulse-ring {
+      0%,100% { box-shadow: 0 0 0 0 rgba(99,102,241,.4); }
+      50%      { box-shadow: 0 0 0 8px rgba(99,102,241,0); }
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.82rem; color: #6b7280; height: 20px;
+    }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #374151;
+      transition: background .3s;
+    }
+    .status-dot.connecting { background: #f59e0b; animation: blink .8s infinite; }
+    .status-dot.ready      { background: #22c55e; }
+    .status-dot.listening  { background: #6366f1; animation: blink .6s infinite; }
+    .status-dot.speaking   { background: #6366f1; }
+    @keyframes blink { 50% { opacity: .3; } }
+
+    /* Transcript */
+    .transcript {
+      width: 100%; max-width: 460px; min-height: 48px;
+      background: #1a1a2e; border-radius: 10px; padding: 10px 14px;
+      font-size: 0.85rem; color: #94a3b8; line-height: 1.5;
+      border: 1px solid #2d2d4e;
+    }
+    .transcript .user-text  { color: #e2e8f0; }
+    .transcript .avatar-text { color: #a5b4fc; font-style: italic; }
+
+    /* Controls */
+    .controls { display: flex; gap: 12px; align-items: center; }
+
+    .btn-mic {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: #6366f1; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; transition: all .2s;
+      box-shadow: 0 0 20px rgba(99,102,241,.4);
+    }
+    .btn-mic:hover    { background: #4f46e5; transform: scale(1.05); }
+    .btn-mic.muted    { background: #374151; box-shadow: none; }
+    .btn-mic:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      padding: 10px 18px; border-radius: 8px; border: 1px solid #374151;
+      background: transparent; color: #9ca3af; font-size: 0.82rem;
+      cursor: pointer; transition: all .2s;
+    }
+    .btn-secondary:hover { border-color: #6366f1; color: #e2e8f0; }
+
+    /* ── Offers column ── */
+    .offers-col {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: #12121f;
+      border-left: 1px solid #2d2d4e;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .offers-col::-webkit-scrollbar { width: 5px; }
+    .offers-col::-webkit-scrollbar-thumb { background: #2d2d4e; border-radius: 4px; }
+
+    .offers-header {
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: #4b5563; margin-bottom: 4px;
+    }
+
+    .offer-card {
+      background: #1a1a2e; border-radius: 10px; padding: 14px 16px;
+      border-left: 3px solid #6366f1;
+      animation: fadeIn .3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+
+    .offer-title { font-size: 0.9rem; font-weight: 700; color: #e2e8f0; margin-bottom: 3px; }
+    .offer-title a { color: inherit; text-decoration: none; }
+    .offer-title a:hover { color: #a5b4fc; }
+    .offer-inst  { font-size: 0.75rem; color: #6366f1; font-weight: 600; margin-bottom: 6px; }
+    .offer-desc  {
+      font-size: 0.78rem; color: #6b7280; line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .offer-meta  { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; align-items: center; }
+    .offer-badge {
+      font-size: 0.68rem; padding: 2px 7px; border-radius: 20px;
+      background: #2d2d4e; color: #9ca3af;
+    }
+    .offer-badge.dist  { background: #1e3a5f; color: #60a5fa; }
+    .offer-badge.free  { background: #14532d; color: #4ade80; }
+    .offer-badge.score { background: #312e81; color: #a5b4fc; }
+    .offer-loc  { font-size: 0.73rem; color: #4b5563; margin-top: 5px; }
+
+    .empty-offers {
+      text-align: center; padding: 60px 20px; color: #374151; font-size: 0.9rem;
+    }
+    .empty-offers .icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+    @media (max-width: 900px) {
+      .main { flex-direction: column; }
+      .avatar-col { flex: none; height: 55vh; }
+      .offers-col { height: 45vh; }
+    }
+      /* ── Permission screen ── */
+    #permScreen {
+      position: fixed; inset: 0; z-index: 100;
+      background: #0f0f1a;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 20px; text-align: center; padding: 32px;
+    }
+    .perm-icon { font-size: 4rem; }
+    .perm-title { font-size: 1.4rem; font-weight: 700; color: #fff; }
+    .perm-sub   { font-size: 0.9rem; color: #6b7280; max-width: 340px; line-height: 1.6; }
+    .btn-allow {
+      padding: 14px 36px; background: #6366f1; color: #fff;
+      border: none; border-radius: 12px; font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: background .2s;
+    }
+    .btn-allow:hover { background: #4f46e5; }
+    .perm-error { color: #f87171; font-size: 0.85rem; display: none; }
+  </style>
+</head>
+<body>
+
+<!-- Mikrofon-Berechtigung -->
+<div id="permScreen">
+  <div class="perm-icon">🎙️</div>
+  <div class="perm-title">Mikrofon erforderlich</div>
+  <div class="perm-sub">Der Video-Berater benötigt Zugriff auf Ihr Mikrofon um mit Ihnen sprechen zu können.</div>
+  <button class="btn-allow" onclick="requestMic()">Mikrofon erlauben</button>
+  <div class="perm-error" id="permError">Mikrofon-Zugriff verweigert. Bitte erlauben Sie den Zugriff in den Browser-Einstellungen.</div>
+</div>
+
+<header>
+  <div class="header-left">
+    <div style="width:36px;height:36px;border-radius:50%;background:#6366f1;display:flex;align-items:center;justify-content:center;font-size:1.1rem">🧑‍💼</div>
+    <div>
+      <div class="header-title">Sozialberatung Tirol</div>
+      <div class="header-sub">Live Avatar · DSRP</div>
+    </div>
+  </div>
+  <div class="header-links">
+    <a href="/chat.html">💬 Text-Chat</a>
+    <a href="/">← Suche</a>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Avatar -->
+  <div class="avatar-col">
+    <div class="video-wrap" id="videoWrap">
+      <video id="avatarVideo" autoplay playsinline></video>
+      <div class="video-placeholder" id="placeholder">
+        <div class="icon">🧑‍💼</div>
+        <div id="placeholderText">Auf Verbinden klicken</div>
+      </div>
+      <div class="listening-ring" id="listeningRing"></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Nicht verbunden</span>
+    </div>
+
+    <div class="transcript" id="transcript">
+      <span style="color:#374151">Gespräch erscheint hier...</span>
+    </div>
+
+    <div class="controls">
+      <button class="btn-mic" id="btnMic" disabled title="Mikrofon">🎤</button>
+      <button class="btn-secondary" id="btnConnect" onclick="connect()">Verbinden</button>
+      <button class="btn-secondary" id="btnStop" onclick="stopSession()" style="display:none">Beenden</button>
+    </div>
+  </div>
+
+  <!-- Offers -->
+  <div class="offers-col" id="offersCol">
+    <div class="empty-offers">
+      <div class="icon">🎙️</div>
+      Sprechen Sie mit dem Avatar –<br>passende Angebote erscheinen hier
+    </div>
+  </div>
+
+</div>
+
+<script src="/liveavatar-sdk.js"></script>
+<script>
+  const API = '';
+  let session      = null;
+  let micStream    = null;
+
+  async function requestMic() {
+    const btn = document.querySelector('.btn-allow');
+    btn.disabled = true;
+    btn.textContent = 'Wird aktiviert...';
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Permission granted — hide permission screen, show chatbot
+      document.getElementById('permScreen').style.display = 'none';
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Erneut versuchen';
+      const errEl = document.getElementById('permError');
+      errEl.style.display = 'block';
+      errEl.textContent = err.name === 'NotAllowedError'
+        ? 'Zugriff verweigert. Bitte in den Browser-Einstellungen erlauben.'
+        : 'Mikrofon nicht verfügbar: ' + err.message;
+    }
+  }
+
+
+  let sessionToken = null;
+  let micActive    = false;
+  const history    = [];
+
+  const btnMic   = document.getElementById('btnMic');
+  const btnStop  = document.getElementById('btnStop');
+  const btnConn  = document.getElementById('btnConnect');
+
+  function setStatus(state, text) {
+    const dot = document.getElementById('statusDot');
+    dot.className = 'status-dot ' + state;
+    document.getElementById('statusText').textContent = text;
+  }
+
+  function addTranscript(who, text) {
+    const el  = document.getElementById('transcript');
+    const cls = who === 'user' ? 'user-text' : 'avatar-text';
+    const pfx = who === 'user' ? 'Sie: ' : 'Berater: ';
+    el.innerHTML = `<span class="${cls}">${pfx}${esc(text)}</span>`;
+  }
+
+  async function connect() {
+    btnConn.disabled = true;
+    btnConn.textContent = 'Vorbereitung...';
+    setStatus('connecting', 'Session wird erstellt...');
+    document.getElementById('placeholderText').textContent = 'Auf Verbindung warten...';
+
+    try {
+      const res  = await fetch(`${API}/api/avatar/session`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      sessionToken = data.session_token;
+
+      const LA  = window.LiveAvatarSDK;
+      session   = new LA.LiveAvatarSession(data.session_token);
+      const Ev  = LA.SessionEvent;
+      const AEv = LA.AgentEventsEnum;
+
+      session.on(Ev.SESSION_STREAM_READY, () => {
+        session.attach(document.getElementById('avatarVideo'));
+        document.getElementById('avatarVideo').style.display = 'block';
+        document.getElementById('placeholder').style.display = 'none';
+        btnMic.disabled = false;
+        btnStop.style.display = 'inline-block';
+        btnConn.style.display = 'none';
+        setInterval(() => session?.keepAlive?.(), 120000);
+
+        // Mikrofon automatisch einschalten (Permission bereits erteilt)
+        micActive = true;
+        session.voiceChat.start();
+        btnMic.classList.remove('muted');
+        btnMic.textContent = '🎤';
+        setStatus('listening', 'Hört zu...');
+        document.getElementById('listeningRing').classList.add('active');
+      });
+
+      session.on(AEv.USER_TRANSCRIPTION, async (event) => {
+        const text = event?.text ?? event?.data?.text ?? String(event ?? '');
+        if (!text.trim()) return;
+        addTranscript('user', text);
+        history.push({ role: 'user', content: text });
+        setStatus('speaking', 'Antwort wird gesucht...');
+        session.interrupt();
+        try {
+          const chatRes  = await fetch(`${API}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ messages: history }),
+          });
+          const chatData = await chatRes.json();
+          if (!chatRes.ok) throw new Error(chatData.error);
+          history.push({ role: 'assistant', content: chatData.reply });
+          session.repeat(chatData.reply);
+          addTranscript('avatar', chatData.reply);
+          if (chatData.offers?.length) renderOffers(chatData.offers);
+        } catch (e) { console.error('Chat error:', e); }
+        setStatus('listening', 'Hört zu...');
+      });
+
+      session.on(AEv.AVATAR_SPEAK_STARTED, () => setStatus('speaking', 'Spricht...'));
+      session.on(AEv.AVATAR_SPEAK_ENDED,   () => {
+        if (micActive) setStatus('listening', 'Hört zu...');
+        else setStatus('ready', 'Bereit');
+      });
+      session.on(AEv.SESSION_STOPPED,     () => { setStatus('', 'Beendet'); resetUI(); });
+      session.on(Ev.SESSION_DISCONNECTED, () => { setStatus('', 'Verbindung unterbrochen'); resetUI(); });
+
+      // Start session — video loads but mic stays off until user clicks
+      await session.start();
+
+    } catch (err) {
+      setStatus('', 'Fehler: ' + err.message);
+      btnConn.disabled = false;
+      btnConn.textContent = 'Verbinden';
+    }
+  }
+
+  function toggleMic() {
+    if (!session) return;
+    micActive = !micActive;
+    if (micActive) {
+      session.voiceChat.start();
+      btnMic.classList.remove('muted');
+      btnMic.textContent = '🎤';
+      setStatus('listening', 'Hört zu...');
+      document.getElementById('listeningRing').classList.add('active');
+    } else {
+      session.voiceChat.stop();
+      btnMic.classList.add('muted');
+      btnMic.textContent = '🔇';
+      setStatus('ready', 'Bereit');
+      document.getElementById('listeningRing').classList.remove('active');
+    }
+  }
+
+  async function stopSession() {
+    micStream?.getTracks().forEach(t => t.stop());
+    if (sessionToken) {
+      await fetch(`${API}/api/avatar/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_token: sessionToken }),
+      });
+    }
+    session?.stop();
+    sessionToken = null;
+    resetUI();
+  }
+
+  function resetUI() {
+    document.getElementById('avatarVideo').style.display = 'none';
+    document.getElementById('placeholder').style.display = 'flex';
+    document.getElementById('placeholderText').textContent = 'Sitzung beendet';
+    btnMic.disabled = true;
+    btnMic.classList.add('muted');
+    btnStop.style.display = 'none';
+    btnConn.style.display = 'inline-block';
+    btnConn.disabled = false;
+    btnConn.textContent = 'Neu verbinden';
+    document.getElementById('listeningRing').classList.remove('active');
+    micActive = false;
+  }
+
+  btnMic.addEventListener('click', toggleMic);
+
+  function renderOffers(offers) {
+    document.getElementById('offersCol').innerHTML =
+      `<div class="offers-header">Passende Angebote (${offers.length})</div>` +
+      offers.map(o => {
+        const desc  = o.description_print || o.description || '';
+        const dist  = o.distance_km != null
+          ? `<span class="offer-badge dist">📍 ${parseFloat(o.distance_km) < 1 ? Math.round(parseFloat(o.distance_km)*1000)+'m' : parseFloat(o.distance_km).toFixed(1)+'km'}</span>`
+          : '';
+        const score = o.score ? `<span class="offer-badge score">${Math.round(o.score*100)}%</span>` : '';
+        const free  = o.costs === 'no' ? `<span class="offer-badge free">Kostenlos</span>` : '';
+        const locs  = (o.locations||[]).filter(l=>l.city).slice(0,2)
+          .map(l=>`${esc(l.city)}${l.street?', '+esc(l.street):''}`).join(' · ');
+        const title = o.website
+          ? `<a href="${esc(o.website)}" target="_blank" rel="noopener">${esc(o.title)}</a>`
+          : esc(o.title);
+        return `
+          <div class="offer-card">
+            <div class="offer-title">${title}</div>
+            <div class="offer-inst">${esc(o.institution_name||'')}</div>
+            ${desc ? `<div class="offer-desc">${esc(desc)}</div>` : ''}
+            ${locs ? `<div class="offer-loc">📍 ${locs}</div>` : ''}
+            <div class="offer-meta">${dist}${score}${free}</div>
+          </div>`;
+      }).join('');
+  }
+
+  function esc(s) {
+    return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

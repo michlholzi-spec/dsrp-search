@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "DSRP Semantic Search API",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npx esbuild node_modules/@heygen/liveavatar-web-sdk/dist/index.esm.js --bundle --platform=browser --global-name=LiveAvatarSDK --format=iife --outfile=public/liveavatar-sdk.js",
     "start": "node dist/search_api.js",
     "dev": "tsx src/search_api.ts",
     "migrate": "tsx src/mongo_to_postgres.ts",
@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@heygen/liveavatar-web-sdk": "^0.0.18",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
